@@ -1,14 +1,14 @@
 package org.jctools.queues;
 
+import org.jctools.queues.blocking.BlockingQueueFactory;
+import org.jctools.queues.spec.ConcurrentQueueSpec;
+
 import java.lang.reflect.Constructor;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedTransferQueue;
-
-import org.jctools.queues.blocking.BlockingQueueFactory;
-import org.jctools.queues.spec.ConcurrentQueueSpec;
 
 public class QueueByTypeFactory {
     public static final int QUEUE_CAPACITY = 1 << Integer.getInteger("pow2.capacity", 17);
@@ -122,6 +122,13 @@ public class QueueByTypeFactory {
         try {
             return Class.forName("org.jctools.queues.atomic."+queueType);
         } catch (ClassNotFoundException e) {
+        }
+        try
+        {
+            return Class.forName("org.jctools.queues.varhandle." + queueType);
+        }
+        catch (ClassNotFoundException e)
+        {
         }
         try {
             return Class.forName("java.util."+queueType);
