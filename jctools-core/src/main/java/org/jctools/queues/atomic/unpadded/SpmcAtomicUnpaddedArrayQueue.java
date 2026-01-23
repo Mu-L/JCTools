@@ -38,7 +38,7 @@ abstract class SpmcAtomicUnpaddedArrayQueueProducerIndexField<E> extends SpmcAto
 
     private static final AtomicLongFieldUpdater<SpmcAtomicUnpaddedArrayQueueProducerIndexField> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(SpmcAtomicUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     SpmcAtomicUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -77,7 +77,7 @@ abstract class SpmcAtomicUnpaddedArrayQueueConsumerIndexField<E> extends SpmcAto
 
     private static final AtomicLongFieldUpdater<SpmcAtomicUnpaddedArrayQueueConsumerIndexField> C_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(SpmcAtomicUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpmcAtomicUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);
@@ -112,7 +112,7 @@ abstract class SpmcAtomicUnpaddedArrayQueueProducerIndexCacheField<E> extends Sp
 
     // This is separated from the consumerIndex which will be highly contended in the hope that this value spends most
     // of it's time in a cache line that is Shared(and rarely invalidated)
-    private volatile long producerIndexCache;
+    volatile long producerIndexCache;
 
     SpmcAtomicUnpaddedArrayQueueProducerIndexCacheField(int capacity) {
         super(capacity);

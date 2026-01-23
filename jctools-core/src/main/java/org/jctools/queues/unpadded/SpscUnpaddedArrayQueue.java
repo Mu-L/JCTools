@@ -53,7 +53,7 @@ abstract class SpscUnpaddedArrayQueueProducerIndexFields<E> extends SpscUnpadded
 
     private final static long P_INDEX_OFFSET = fieldOffset(SpscUnpaddedArrayQueueProducerIndexFields.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     protected long producerLimit;
 
@@ -94,7 +94,7 @@ abstract class SpscUnpaddedArrayQueueConsumerIndexField<E> extends SpscUnpaddedA
 
     private final static long C_INDEX_OFFSET = fieldOffset(SpscUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpscUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

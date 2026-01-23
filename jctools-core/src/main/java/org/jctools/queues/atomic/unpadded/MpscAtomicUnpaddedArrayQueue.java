@@ -38,7 +38,7 @@ abstract class MpscAtomicUnpaddedArrayQueueProducerIndexField<E> extends MpscAto
 
     private static final AtomicLongFieldUpdater<MpscAtomicUnpaddedArrayQueueProducerIndexField> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpscAtomicUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     MpscAtomicUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -74,7 +74,7 @@ abstract class MpscAtomicUnpaddedArrayQueueProducerLimitField<E> extends MpscAto
     private static final AtomicLongFieldUpdater<MpscAtomicUnpaddedArrayQueueProducerLimitField> P_LIMIT_UPDATER = AtomicLongFieldUpdater.newUpdater(MpscAtomicUnpaddedArrayQueueProducerLimitField.class, "producerLimit");
 
     // First unavailable index the producer may claim up to before rereading the consumer index
-    private volatile long producerLimit;
+    volatile long producerLimit;
 
     MpscAtomicUnpaddedArrayQueueProducerLimitField(int capacity) {
         super(capacity);
@@ -109,7 +109,7 @@ abstract class MpscAtomicUnpaddedArrayQueueConsumerIndexField<E> extends MpscAto
 
     private static final AtomicLongFieldUpdater<MpscAtomicUnpaddedArrayQueueConsumerIndexField> C_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpscAtomicUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     MpscAtomicUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

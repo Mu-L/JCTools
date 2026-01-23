@@ -14,6 +14,7 @@
 package org.jctools.queues.unpadded;
 
 import org.jctools.queues.IndexedQueueSizeUtil.IndexedQueue;
+import org.jctools.util.InternalAPI;
 import org.jctools.util.Pow2;
 import java.util.AbstractQueue;
 import java.util.Iterator;
@@ -35,13 +36,15 @@ abstract class ConcurrentCircularUnpaddedArrayQueueL0Pad<E> extends AbstractQueu
  * Common functionality for array backed queues. The class is pre-padded and the array is padded on either side to help
  * with False Sharing prevention. It is expected that subclasses handle post padding.
  */
-abstract class ConcurrentCircularUnpaddedArrayQueue<E> extends ConcurrentCircularUnpaddedArrayQueueL0Pad<E> implements MessagePassingQueue<E>, IndexedQueue, QueueProgressIndicators, SupportsIterator {
+@InternalAPI
+public abstract class ConcurrentCircularUnpaddedArrayQueue<E> extends ConcurrentCircularUnpaddedArrayQueueL0Pad<E> implements MessagePassingQueue<E>, IndexedQueue, QueueProgressIndicators, SupportsIterator {
 
     protected final long mask;
 
     protected final E[] buffer;
 
-    ConcurrentCircularUnpaddedArrayQueue(int capacity) {
+    @InternalAPI
+    public ConcurrentCircularUnpaddedArrayQueue(int capacity) {
         int actualCapacity = Pow2.roundToPowerOfTwo(capacity);
         mask = actualCapacity - 1;
         buffer = allocateRefArray(actualCapacity);

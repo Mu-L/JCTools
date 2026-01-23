@@ -37,7 +37,7 @@ abstract class MpscUnpaddedArrayQueueProducerIndexField<E> extends MpscUnpaddedA
 
     private final static long P_INDEX_OFFSET = fieldOffset(MpscUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     MpscUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -73,7 +73,7 @@ abstract class MpscUnpaddedArrayQueueProducerLimitField<E> extends MpscUnpaddedA
     private final static long P_LIMIT_OFFSET = fieldOffset(MpscUnpaddedArrayQueueProducerLimitField.class, "producerLimit");
 
     // First unavailable index the producer may claim up to before rereading the consumer index
-    private volatile long producerLimit;
+    volatile long producerLimit;
 
     MpscUnpaddedArrayQueueProducerLimitField(int capacity) {
         super(capacity);
@@ -108,7 +108,7 @@ abstract class MpscUnpaddedArrayQueueConsumerIndexField<E> extends MpscUnpaddedA
 
     private final static long C_INDEX_OFFSET = fieldOffset(MpscUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     MpscUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

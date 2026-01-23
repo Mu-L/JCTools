@@ -39,7 +39,7 @@ abstract class MpmcAtomicUnpaddedArrayQueueProducerIndexField<E> extends MpmcAto
 
     private static final AtomicLongFieldUpdater<MpmcAtomicUnpaddedArrayQueueProducerIndexField> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpmcAtomicUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     MpmcAtomicUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -74,7 +74,7 @@ abstract class MpmcAtomicUnpaddedArrayQueueConsumerIndexField<E> extends MpmcAto
 
     private static final AtomicLongFieldUpdater<MpmcAtomicUnpaddedArrayQueueConsumerIndexField> C_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpmcAtomicUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     MpmcAtomicUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

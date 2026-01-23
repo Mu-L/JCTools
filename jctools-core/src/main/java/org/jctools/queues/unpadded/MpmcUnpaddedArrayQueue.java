@@ -39,7 +39,7 @@ abstract class MpmcUnpaddedArrayQueueProducerIndexField<E> extends MpmcUnpaddedA
 
     private final static long P_INDEX_OFFSET = fieldOffset(MpmcUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     MpmcUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -74,7 +74,7 @@ abstract class MpmcUnpaddedArrayQueueConsumerIndexField<E> extends MpmcUnpaddedA
 
     private final static long C_INDEX_OFFSET = fieldOffset(MpmcUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     MpmcUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

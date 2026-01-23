@@ -100,7 +100,7 @@ abstract class SpscAtomicArrayQueueProducerIndexFields<E> extends SpscAtomicArra
 
     private static final AtomicLongFieldUpdater<SpscAtomicArrayQueueProducerIndexFields> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(SpscAtomicArrayQueueProducerIndexFields.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     protected long producerLimit;
 
@@ -189,7 +189,7 @@ abstract class SpscAtomicArrayQueueConsumerIndexField<E> extends SpscAtomicArray
 
     private static final AtomicLongFieldUpdater<SpscAtomicArrayQueueConsumerIndexField> C_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(SpscAtomicArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpscAtomicArrayQueueConsumerIndexField(int capacity) {
         super(capacity);

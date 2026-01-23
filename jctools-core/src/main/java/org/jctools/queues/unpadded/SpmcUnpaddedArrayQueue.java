@@ -37,7 +37,7 @@ abstract class SpmcUnpaddedArrayQueueProducerIndexField<E> extends SpmcUnpaddedA
 
     protected final static long P_INDEX_OFFSET = fieldOffset(SpmcUnpaddedArrayQueueProducerIndexField.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     SpmcUnpaddedArrayQueueProducerIndexField(int capacity) {
         super(capacity);
@@ -76,7 +76,7 @@ abstract class SpmcUnpaddedArrayQueueConsumerIndexField<E> extends SpmcUnpaddedA
 
     protected final static long C_INDEX_OFFSET = fieldOffset(SpmcUnpaddedArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpmcUnpaddedArrayQueueConsumerIndexField(int capacity) {
         super(capacity);
@@ -111,7 +111,7 @@ abstract class SpmcUnpaddedArrayQueueProducerIndexCacheField<E> extends SpmcUnpa
 
     // This is separated from the consumerIndex which will be highly contended in the hope that this value spends most
     // of it's time in a cache line that is Shared(and rarely invalidated)
-    private volatile long producerIndexCache;
+    volatile long producerIndexCache;
 
     SpmcUnpaddedArrayQueueProducerIndexCacheField(int capacity) {
         super(capacity);
