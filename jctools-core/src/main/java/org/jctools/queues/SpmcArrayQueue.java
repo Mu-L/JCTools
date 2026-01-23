@@ -47,7 +47,7 @@ abstract class SpmcArrayQueueProducerIndexField<E> extends SpmcArrayQueueL1Pad<E
 {
     protected final static long P_INDEX_OFFSET = fieldOffset(SpmcArrayQueueProducerIndexField.class,"producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
 
     SpmcArrayQueueProducerIndexField(int capacity)
     {
@@ -102,7 +102,7 @@ abstract class SpmcArrayQueueConsumerIndexField<E> extends SpmcArrayQueueL2Pad<E
 {
     protected final static long C_INDEX_OFFSET = fieldOffset(SpmcArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpmcArrayQueueConsumerIndexField(int capacity)
     {
@@ -151,7 +151,7 @@ abstract class SpmcArrayQueueProducerIndexCacheField<E> extends SpmcArrayQueueMi
 {
     // This is separated from the consumerIndex which will be highly contended in the hope that this value spends most
     // of it's time in a cache line that is Shared(and rarely invalidated)
-    private volatile long producerIndexCache;
+    volatile long producerIndexCache;
 
     SpmcArrayQueueProducerIndexCacheField(int capacity)
     {

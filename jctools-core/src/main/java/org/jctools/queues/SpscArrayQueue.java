@@ -62,7 +62,7 @@ abstract class SpscArrayQueueProducerIndexFields<E> extends SpscArrayQueueL1Pad<
 {
     private final static long P_INDEX_OFFSET = fieldOffset(SpscArrayQueueProducerIndexFields.class, "producerIndex");
 
-    private volatile long producerIndex;
+    volatile long producerIndex;
     protected long producerLimit;
 
     SpscArrayQueueProducerIndexFields(int capacity)
@@ -118,7 +118,7 @@ abstract class SpscArrayQueueConsumerIndexField<E> extends SpscArrayQueueL2Pad<E
 {
     private final static long C_INDEX_OFFSET = fieldOffset(SpscArrayQueueConsumerIndexField.class, "consumerIndex");
 
-    private volatile long consumerIndex;
+    volatile long consumerIndex;
 
     SpscArrayQueueConsumerIndexField(int capacity)
     {
