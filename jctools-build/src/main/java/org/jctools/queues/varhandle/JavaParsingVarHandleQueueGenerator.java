@@ -1,0 +1,358 @@
+package org.jctools.queues.varhandle;
+
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ast.*;
+import com.github.javaparser.ast.Modifier.Keyword;
+import com.github.javaparser.ast.body.*;
+import com.github.javaparser.ast.comments.Comment;
+import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.expr.AssignExpr.Operator;
+import com.github.javaparser.ast.nodeTypes.NodeWithType;
+import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.stmt.ExpressionStmt;
+import com.github.javaparser.ast.stmt.ReturnStmt;
+import com.github.javaparser.ast.type.ArrayType;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+import org.jctools.queues.util.JCToolsGenerator;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Base class of the atomic queue generators. These generators work by parsing a Java source file using
+ * {@link JavaParser}, and replacing idioms that use {@link sun.misc.Unsafe} to instead use VarHandle field updates,
+ * e.g.{@link java.lang.invoke.VarHandle}. They are coupled directly to the structure of the
+ * expected input Java source file and are used as a utility to maintain unsafe non-portable optimized code alongside
+ * safe portable code for uses such as on Android, etc
+ * <p>
+ * These generators are coupled with the structure and naming of fields, variables and methods and are not suitable for
+ * general purpose use.
+ */
+public abstract class JavaParsingVarHandleQueueGenerator extends VoidVisitorAdapter<Void> implements JCToolsGenerator {
+
+    /**
+     * When set on a class using a single line comment, the class has fields that have unsafe 'ordered' reads and
+     * writes. These fields are candidates to be patched by the generator. Other classes the fields remain unadjusted.
+     */
+    protected static final String GEN_DIRECTIVE_CLASS_CONTAINS_ORDERED_FIELD_ACCESSORS = "$gen:ordered-fields";
+
+    /**
+     * When set on a method using a single line comment, the method is not patched by the generator.
+     */
+    protected static final String GEN_DIRECTIVE_METHOD_IGNORE = "$gen:ignore";
+
+    protected final String sourceFileName;
+
+    protected String outputPackage() {
+        return "org.jctools.queues.varhandle";
+    }
+
+    protected String queueClassNamePrefix() {
+        return "VarHandle";
+    }
+
+    JavaParsingVarHandleQueueGenerator(String sourceFileName) {
+        this.sourceFileName = sourceFileName;
+    }
+
+    abstract void processSpecialNodeTypes(NodeWithType<?, Type> node, String name);
+    abstract String fieldUpdaterFieldName(String fieldName);
+
+    @Override
+    public void visit(PackageDeclaration n, Void arg) {
+        super.visit(n, arg);
+        // Change the package of the output
+        n.setName(outputPackage());
+    }
+
+    @Override
+    public void visit(Parameter n, Void arg) {
+        super.visit(n, arg);
+        // Process parameters to methods and ctors
+        processSpecialNodeTypes(n);
+    }
+
+    @Override
+    public void visit(VariableDeclarator n, Void arg) {
+        super.visit(n, arg);
+        // Replace declared variables with altered types
+        processSpecialNodeTypes(n);
+    }
+
+    private void processSpecialNodeTypes(Parameter node) {
+        processSpecialNodeTypes(node, node.getNameAsString());
+    }
+
+    private void processSpecialNodeTypes(VariableDeclarator node) {
+        processSpecialNodeTypes(node, node.getNameAsString());
+    }
+
+    protected boolean isCommentPresent(Node node, String wanted) {
+        Optional<Comment> maybeComment = node.getComment();
+        if (maybeComment.isPresent()) {
+            Comment comment = maybeComment.get();
+            String content = comment.getContent().trim();
+            if (wanted.equals(content)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected void removeStaticFieldsAndInitialisers(ClassOrInterfaceDeclaration node) {
+        // Remove all the static initialisers
+        for (InitializerDeclaration child : node.getChildNodesByType(InitializerDeclaration.class)) {
+            child.remove();
+        }
+
+        // Remove all static fields
+        for (FieldDeclaration field : node.getFields()) {
+            if (field.getModifiers().contains(Modifier.staticModifier())) {
+                field.remove();
+            }
+        }
+    }
+
+    @Override
+    public String translateQueueName(String qName) {
+        if (qName.contains("LinkedQueue") || qName.contains("LinkedArrayQueue")) {
+            return qName.replace("Linked", "Linked" + queueClassNamePrefix());
+        }
+
+        if (qName.contains("ArrayQueue")) {
+            return qName.replace("ArrayQueue", queueClassNamePrefix() + "ArrayQueue");
+        }
+
+        throw new IllegalArgumentException("Unexpected queue name: " + qName);
+
+    }
+
+    boolean patchAtomicFieldUpdaterAccessorMethod(String variableName, MethodDeclaration method, String methodNameSuffix)
+    {
+        boolean usesFieldUpdater = false;
+        String methodName = method.getNameAsString();
+        if (!methodName.endsWith(methodNameSuffix)) {
+            // Leave it untouched
+            return false;
+        }
+
+        String newValueName = "newValue";
+        if (methodName.startsWith("so") || methodName.startsWith("sp"))
+        {
+            /*
+             * In the case of 'sp' use lazySet as the weakest
+             * ordering allowed by field updaters
+             */
+            usesFieldUpdater = true;
+            String fieldUpdaterFieldName = fieldUpdaterFieldName(variableName);
+
+            method.setBody(fieldUpdaterLazySet(fieldUpdaterFieldName, newValueName));
+        }
+        else if (methodName.startsWith("cas"))
+        {
+            usesFieldUpdater = true;
+            String fieldUpdaterFieldName = fieldUpdaterFieldName(variableName);
+            String expectedValueName = "expect";
+            method.setBody(
+                fieldUpdaterCompareAndSet(fieldUpdaterFieldName, expectedValueName, newValueName));
+        }
+        else if (methodName.startsWith("sv"))
+        {
+            method.setBody(fieldAssignment(variableName, newValueName));
+        }
+        else if (methodName.startsWith("lv") || methodName.startsWith("lp"))
+        {
+            method.setBody(returnField(variableName));
+        }
+        else
+        {
+            throw new IllegalStateException("Unhandled method: " + methodName);
+        }
+        return usesFieldUpdater;
+    }
+
+    /**
+     * Searches all extended or implemented super classes or interfaces for
+     * special classes that differ with the atomics version and replaces them
+     * with the appropriate class.
+     */
+     protected void replaceParentClassesForAtomics(ClassOrInterfaceDeclaration n) {
+        for (ClassOrInterfaceType parent : n.getExtendedTypes()) {
+            String parentNameAsString = parent.getNameAsString();
+            switch (parentNameAsString) {
+                case "AbstractQueue":
+                    // ignore the JDK parent
+                    break;
+                case "BaseLinkedQueue":
+                    parent.setName("BaseLinked" + queueClassNamePrefix() + "Queue");
+                    break;
+                case "ConcurrentCircularArrayQueue":
+                    break;
+                case "ConcurrentSequencedCircularArrayQueue":
+                    break;
+                default:
+                    // Padded super classes are to be renamed and thus so does the
+                    // class we must extend.
+                    parent.setName(translateQueueName(parentNameAsString));
+            }
+        }
+    }
+
+    @Override
+    public void cleanupComments(CompilationUnit cu) {
+        // nop
+    }
+
+    @Override
+    public void organiseImports(CompilationUnit cu) {
+        List<ImportDeclaration> importDecls = new ArrayList<>();
+
+        // remove irrelevant imports
+        for (ImportDeclaration importDeclaration : cu.getImports()) {
+            String name = importDeclaration.getNameAsString();
+            if (name.startsWith("org.jctools.util.Unsafe")) {
+                continue;
+            }
+
+            if (name.startsWith("org.jctools.queues.LinkedArrayQueueUtil")) {
+                continue;
+            }
+
+            importDecls.add(importDeclaration);
+        }
+        cu.getImports().clear();
+        for (ImportDeclaration importDecl : importDecls) {
+            cu.addImport(importDecl);
+        }
+
+        cu.addImport(new ImportDeclaration("java.lang.invoke.VarHandle", false, false));
+
+        cu.addImport(new ImportDeclaration("org.jctools.queues", false, true));
+        cu.addImport(staticImportDeclaration("org.jctools.queues.varhandle.VarHandleQueueUtil"));
+    }
+
+    protected String capitalise(String s) {
+        return s.substring(0, 1).toUpperCase() + s.substring(1);
+    }
+
+    /**
+     * Generates something like
+     * <code>P_INDEX_UPDATER.setRelease(this, newValue)</code>
+     */
+    protected BlockStmt fieldUpdaterLazySet(String fieldUpdaterFieldName, String newValueName) {
+        BlockStmt body = new BlockStmt();
+        body.addStatement(new ExpressionStmt(
+                methodCallExpr(fieldUpdaterFieldName, "setRelease", new ThisExpr(), new NameExpr(newValueName))));
+        return body;
+    }
+
+    /**
+     * Generates something like
+     * <code>return P_INDEX_UPDATER.compareAndSet(this, expectedValue, newValue)</code>
+     */
+    protected BlockStmt fieldUpdaterCompareAndSet(String fieldUpdaterFieldName, String expectedValueName,
+            String newValueName) {
+        BlockStmt body = new BlockStmt();
+        body.addStatement(new ReturnStmt(methodCallExpr(fieldUpdaterFieldName, "compareAndSet", new ThisExpr(),
+                new NameExpr(expectedValueName), new NameExpr(newValueName))));
+        return body;
+    }
+
+    protected MethodCallExpr methodCallExpr(String owner, String method, Expression... args) {
+        MethodCallExpr methodCallExpr = new MethodCallExpr(new NameExpr(owner), method);
+        for (Expression expr : args) {
+            methodCallExpr.addArgument(expr);
+        }
+        return methodCallExpr;
+    }
+
+    /**
+     * Generates something like <code>field = newValue</code>
+     */
+    protected BlockStmt fieldAssignment(String fieldName, String valueName) {
+        BlockStmt body = new BlockStmt();
+        body.addStatement(
+                new ExpressionStmt(new AssignExpr(new NameExpr(fieldName), new NameExpr(valueName), Operator.ASSIGN)));
+        return body;
+    }
+
+    /**
+     * Generates something like
+     * <code>private static final AtomicLongFieldUpdater<MpmcAtomicArrayQueueProducerIndexField> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpmcAtomicArrayQueueProducerIndexField.class, "producerIndex");</code>
+     */
+    protected FieldDeclaration fieldDeclarationWithInitialiser(Type type, String name, Expression initializer,
+            Keyword... modifiers) {
+        FieldDeclaration fieldDeclaration = new FieldDeclaration();
+        VariableDeclarator variable = new VariableDeclarator(type, name, initializer);
+        fieldDeclaration.getVariables().add(variable);
+        fieldDeclaration.setModifiers(modifiers);
+        return fieldDeclaration;
+    }
+
+    /**
+     * Generates something like
+     * <code>private static final AtomicLongFieldUpdater<MpmcAtomicArrayQueueProducerIndexField> P_INDEX_UPDATER = AtomicLongFieldUpdater.newUpdater(MpmcAtomicArrayQueueProducerIndexField.class, "producerIndex");</code>
+     */
+    protected FieldDeclaration declareLongFieldUpdater(String className, String variableName) {
+        //     private static final VarHandle P_INDEX_UPDATER = longFieldVarHandle(SpscVarHandleArrayQueueProducerIndexFields.class, "producerIndex");
+        MethodCallExpr initializer = newVHLongFieldUpdater(className, variableName);
+
+        ClassOrInterfaceType type = classType("VarHandle");
+        return fieldDeclarationWithInitialiser(type, fieldUpdaterFieldName(variableName),
+                initializer, Keyword.PRIVATE, Keyword.STATIC, Keyword.FINAL);
+    }
+
+    protected MethodCallExpr newVHLongFieldUpdater(String className, String variableName) {
+        return methodCallExpr("VarHandleQueueUtil", "longFieldVarHandle", new ClassExpr(classType(className)),
+                new StringLiteralExpr(variableName));
+    }
+
+    protected ClassOrInterfaceType simpleParametricType(String className, String... typeArgs) {
+        NodeList<Type> typeArguments = new NodeList<Type>();
+        for (String typeArg : typeArgs) {
+            typeArguments.add(classType(typeArg));
+        }
+        return new ClassOrInterfaceType(null, new SimpleName(className), typeArguments);
+    }
+
+    protected ClassOrInterfaceType classType(String className) {
+        return new ClassOrInterfaceType(null, className);
+    }
+
+    /**
+     * Generates something like <code>return field</code>
+     *
+     */
+    protected BlockStmt returnField(String fieldName) {
+        BlockStmt body = new BlockStmt();
+        body.addStatement(new ReturnStmt(fieldName));
+        return body;
+    }
+
+    protected boolean isRefArray(Type in, String refClassName) {
+        if (in instanceof ArrayType) {
+            ArrayType aType = (ArrayType) in;
+            return isRefType(aType.getComponentType(), refClassName);
+        }
+        return false;
+    }
+
+    protected boolean isRefType(Type in, String className) {
+        // Does not check type parameters
+        if (in instanceof ClassOrInterfaceType) {
+            return (className.equals(((ClassOrInterfaceType) in).getNameAsString()));
+        }
+        return false;
+    }
+
+    private static <T> T buildGenerator(Class<? extends T> generatorClass, String fileName) throws Exception {
+        return generatorClass.getDeclaredConstructor(String.class).newInstance(fileName);
+    }
+
+    ImportDeclaration staticImportDeclaration(String name) {
+        return new ImportDeclaration(name, true, true);
+    }
+}
